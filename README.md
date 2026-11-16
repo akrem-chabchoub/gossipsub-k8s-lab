@@ -85,9 +85,9 @@ observability stack, and starts the port-forwards. Then open Grafana:
 
 ---
 
-## 🪜 Step by step, with checkpoints
+## 🪜 Step by step
 
-Prefer to go one step at a time? Run these in order and tick each checkpoint before moving on.
+Prefer to go one step at a time? Run these in order, and check what you should see before moving on.
 
 ### 1. Create the cluster (about 1 to 2 minutes)
 
@@ -95,7 +95,9 @@ Prefer to go one step at a time? Run these in order and tick each checkpoint bef
 make cluster-up
 ```
 
-- [ ] The script prints progress and ends with `READY: node Ready, 9/9 kube-system pods running`
+**You should see**
+
+- The script prints progress and ends with `READY: node Ready, 9/9 kube-system pods running`
 
 ### 2. Build and load the images
 
@@ -103,7 +105,9 @@ make cluster-up
 make build
 ```
 
-- [ ] `gossip/go-peer:0.1.1` and `gossip/py-peer:0.1.5` are built and loaded into kind
+**You should see**
+
+- `gossip/go-peer:0.1.1` and `gossip/py-peer:0.1.5` are built and loaded into kind
 
 <details>
 <summary>Build fails with <code>auth.docker.io: i/o timeout</code>?</summary>
@@ -124,8 +128,10 @@ make deploy-mixed      # three Go + three Python peers, namespace gossip-mixed
 make status
 ```
 
-- [ ] Six pods Running in `gossip-lab`
-- [ ] Six pods Running in `gossip-mixed`, with no restarts
+**You should see**
+
+- Six pods Running in `gossip-lab`
+- Six pods Running in `gossip-mixed`, with no restarts
 
 ### 4. Install observability (a few minutes)
 
@@ -133,8 +139,10 @@ make status
 make observability
 ```
 
-- [ ] Script ends with `DONE`
-- [ ] Grafana, Prometheus, Vector, and VictoriaLogs pods are Running in `observability`
+**You should see**
+
+- Script ends with `DONE`
+- Grafana, Prometheus, Vector, and VictoriaLogs pods are Running in `observability`
 
 ### 5. Open the dashboards
 
@@ -142,10 +150,12 @@ make observability
 make forward
 ```
 
-- [ ] Grafana opens at http://localhost:3100
-- [ ] **Dashboards → GossipSub Lab → GossipSub lab** shows data after a couple of minutes
-- [ ] Every peer reports 5 connected peers
-- [ ] Delivery ratio is close to 100% for every subscriber
+**You should see**
+
+- Grafana opens at http://localhost:3100
+- **Dashboards → GossipSub Lab → GossipSub lab** shows data after a couple of minutes
+- Every peer reports 5 connected peers
+- Delivery ratio is close to 100% for every subscriber
 
 ---
 
@@ -155,8 +165,10 @@ make forward
 
 Leave the mixed network running for about 5 minutes, then read the delivery and latency panels.
 
-- [ ] Every subscriber receives every message
-- [ ] Latency stays steady
+**You should see**
+
+- Every subscriber receives every message
+- Latency stays steady
 
 ### Isolation and recovery (cut two peers off)
 
@@ -177,11 +189,11 @@ make test-recover RUN=my-run   # remove the policy
 make test-verify               # after recovery: every probe OK
 ```
 
-Checkpoints:
+**You should see**
 
-- [ ] During the cut, `go-peer-2` and `py-peer-2` drop to 1 connection; the other four drop to 3
-- [ ] After recovery, all six peers return to 5 connections
-- [ ] `results/my-run/events.log` records when isolation started and ended
+- During the cut, `go-peer-2` and `py-peer-2` drop to 1 connection; the other four drop to 3
+- After recovery, all six peers return to 5 connections
+- `results/my-run/events.log` records when isolation started and ended
 
 The probes check real TCP reachability on the GossipSub port, so they prove the cut works beyond the NetworkPolicy
 object existing.
@@ -190,8 +202,10 @@ object existing.
 
 The rule **Peer connectivity below 5** fires when any peer has fewer than 5 connections for 60 seconds.
 
-- [ ] After `make test-isolate`, wait about 70 seconds: **Alerting → Alert rules** shows it **Firing**
-- [ ] After `make test-recover`, it returns to **Normal** within about a minute
+**You should see**
+
+- After `make test-isolate`, wait about 70 seconds: **Alerting → Alert rules** shows it **Firing**
+- After `make test-recover`, it returns to **Normal** within about a minute
 
 Alerts show in Grafana only. No email or Slack contact point is configured.
 
