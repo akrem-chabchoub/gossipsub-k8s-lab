@@ -66,8 +66,6 @@ A second namespace, `gossip-lab`, runs six Go-only peers as the primary-implemen
 - [`kind`](https://kind.sigs.k8s.io/), `kubectl`, `helm`, `python3`, `curl`
 - Network access to Docker Hub, quay.io, registry.k8s.io, and the Helm chart repositories
 
-Every command targets the `kind-gossip-lab` context only, so other clusters on your machine are never touched.
-
 ---
 
 ## 🚀 Quick start
@@ -85,8 +83,6 @@ observability stack, and starts the port-forwards. Then open Grafana:
 | Prometheus | http://localhost:9090 | |
 | VictoriaLogs | http://localhost:9428 | |
 
-> Grafana runs on **3100**, not 3000, so it never collides with another local Grafana.
-
 ---
 
 ## 🪜 Step by step, with checkpoints
@@ -100,8 +96,6 @@ make cluster-up
 ```
 
 - [ ] The script prints progress and ends with `READY: node Ready, 9/9 kube-system pods running`
-
-Calico images are pulled on your machine and loaded into the node first, because pulls from inside kind are slow.
 
 ### 2. Build and load the images
 
