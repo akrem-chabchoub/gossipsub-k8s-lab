@@ -1,0 +1,44 @@
+# Scenario 2 (decision D8): isolate go-peer-2 and py-peer-2 from the rest of gossip-mixed.
+# The two isolated peers may still talk to each other. Telemetry (observability namespace)
+# and DNS stay reachable so the failure is observable. Applied and removed by scripts/isolate.sh.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: isolate-go2-py2
+  namespace: gossip-mixed
+  labels:
+    gossip.lab/experiment: isolation-recovery
+spec:
+  podSelector:
+    matchExpressions:
+      - key: statefulset.kubernetes.io/pod-name
+        operator: In
+        values: ["go-peer-2", "py-peer-2"]
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: statefulset.kubernetes.io/pod-name
+                operator: In
+                values: ["go-peer-2", "py-peer-2"]
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: statefulset.kubernetes.io/pod-name
+                operator: In
+                values: ["go-peer-2", "py-peer-2"]
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}

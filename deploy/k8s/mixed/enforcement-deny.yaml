@@ -1,0 +1,13 @@
+# Enforcement test (D5): deny all ingress and egress for go-peer-2 only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: enforcement-deny-go-peer-2
+  namespace: gossip-mixed
+  labels:
+    gossip.lab/experiment: enforcement-test
+spec:
+  podSelector:
+    matchLabels:
+      statefulset.kubernetes.io/pod-name: go-peer-2
+  policyTypes: ["Ingress", "Egress"]

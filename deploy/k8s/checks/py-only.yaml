@@ -1,0 +1,83 @@
+# Validation stage: three py-libp2p peers in their own namespace, to check the
+# Python image on the cluster before it joins the main network.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gossip-lab-py
+  labels:
+    app.kubernetes.io/part-of: gossip-lab-check
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gossip-peers
+  namespace: gossip-lab-py
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/part-of: gossip-lab-check
+  ports:
+    - {name: libp2p, port: 4001, targetPort: 4001}
+    - {name: metrics, port: 9100, targetPort: 9100}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: py-peer
+  namespace: gossip-lab-py
+  labels:
+    app.kubernetes.io/part-of: gossip-lab-check
+    gossip.lab/impl: py
+spec:
+  serviceName: gossip-peers
+  podManagementPolicy: Parallel
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: gossip-lab-check
+      gossip.lab/impl: py
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: gossip-lab-check
+        gossip.lab/impl: py
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: peer
+          image: gossip/py-peer:0.1.5
+          imagePullPolicy: IfNotPresent
+          ports:
+            - {name: libp2p, containerPort: 4001}
+            - {name: metrics, containerPort: 9100}
+          env:
+            - name: PEER_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+            - name: PEER_NAMES
+              value: "py-peer-0,py-peer-1,py-peer-2"
+            - name: PUBLISHER_NAME
+              value: "py-peer-0"
+            - name: PEER_DNS_SUFFIX
+              value: ".gossip-peers.gossip-lab-py.svc.cluster.local"
+            - {name: TOPIC, value: "lab/v1"}
+            - {name: PUBLISH_RATE, value: "10"}
+            - {name: PAYLOAD_BYTES, value: "1024"}
+            - {name: LISTEN_PORT, value: "4001"}
+            - {name: METRICS_PORT, value: "9100"}
+          readinessProbe:
+            httpGet: {path: /healthz, port: metrics}
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /livez, port: metrics}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}

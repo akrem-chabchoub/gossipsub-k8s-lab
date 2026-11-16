@@ -1,0 +1,164 @@
+# Mixed network: 3 go-libp2p peers + 3 py-libp2p peers on topic lab/v1, in namespace gossip-mixed.
+# Separate namespace so the six-Go-peer deliverable in gossip-lab is not modified.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gossip-mixed
+  labels:
+    app.kubernetes.io/part-of: gossip-mixed
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gossip-peers
+  namespace: gossip-mixed
+  labels:
+    app.kubernetes.io/part-of: gossip-mixed
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/part-of: gossip-mixed
+  ports:
+    - {name: libp2p, port: 4001, targetPort: 4001}
+    - {name: metrics, port: 9100, targetPort: 9100}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: go-peer
+  namespace: gossip-mixed
+  labels:
+    app.kubernetes.io/part-of: gossip-mixed
+    gossip.lab/impl: go
+spec:
+  serviceName: gossip-peers
+  podManagementPolicy: Parallel
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: gossip-mixed
+      gossip.lab/impl: go
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: gossip-mixed
+        gossip.lab/impl: go
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: peer
+          image: gossip/go-peer:0.1.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: libp2p
+              containerPort: 4001
+            - name: metrics
+              containerPort: 9100
+          env:
+            - name: PEER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: PEER_NAMES
+              value: "go-peer-0,go-peer-1,go-peer-2,py-peer-0,py-peer-1,py-peer-2"
+            - name: PUBLISHER_NAME
+              value: "go-peer-0"
+            - name: PEER_DNS_SUFFIX
+              value: ".gossip-peers.gossip-mixed.svc.cluster.local"
+            - name: TOPIC
+              value: "lab/v1"
+            - name: PUBLISH_RATE
+              value: "10"
+            - name: PAYLOAD_BYTES
+              value: "1024"
+            - name: LISTEN_PORT
+              value: "4001"
+            - name: METRICS_PORT
+              value: "9100"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: py-peer
+  namespace: gossip-mixed
+  labels:
+    app.kubernetes.io/part-of: gossip-mixed
+    gossip.lab/impl: py
+spec:
+  serviceName: gossip-peers
+  podManagementPolicy: Parallel
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: gossip-mixed
+      gossip.lab/impl: py
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: gossip-mixed
+        gossip.lab/impl: py
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: peer
+          image: gossip/py-peer:0.1.5
+          imagePullPolicy: IfNotPresent
+          ports:
+            - {name: libp2p, containerPort: 4001}
+            - {name: metrics, containerPort: 9100}
+          env:
+            - name: PEER_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+            - name: PEER_NAMES
+              value: "go-peer-0,go-peer-1,go-peer-2,py-peer-0,py-peer-1,py-peer-2"
+            - name: PUBLISHER_NAME
+              value: "go-peer-0"
+            - name: PEER_DNS_SUFFIX
+              value: ".gossip-peers.gossip-mixed.svc.cluster.local"
+            - {name: TOPIC, value: "lab/v1"}
+            - {name: PUBLISH_RATE, value: "10"}
+            - {name: PAYLOAD_BYTES, value: "1024"}
+            - {name: LISTEN_PORT, value: "4001"}
+            - {name: METRICS_PORT, value: "9100"}
+          readinessProbe:
+            httpGet: {path: /healthz, port: metrics}
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /livez, port: metrics}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}

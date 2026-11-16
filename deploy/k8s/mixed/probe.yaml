@@ -1,0 +1,17 @@
+# Diagnostic pod for TCP reachability checks (scenario 2 verification, decision D9).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: probe
+  namespace: gossip-mixed
+  labels:
+    gossip.lab/experiment: probe
+spec:
+  restartPolicy: Never
+  containers:
+    - name: probe
+      image: busybox:1.37
+      command: ["sleep", "7200"]
+      resources:
+        requests: {cpu: 10m, memory: 16Mi}
+        limits: {cpu: 100m, memory: 64Mi}
