@@ -161,14 +161,25 @@ make forward
 
 ## 🧪 Run the experiments
 
-### Baseline
+### Baseline (scenario 1)
 
-Leave the mixed network running for about 5 minutes, then read the delivery and latency panels.
+**One command** (about 7 minutes, results saved to `results/<RUN>/`):
+
+```bash
+make test-scenario1 RUN=baseline1                    # mixed network (gossip-mixed)
+make test-scenario1 RUN=baseline-go NS=gossip-lab    # six Go peers (primary implementation)
+```
+
+The script waits until every peer is Ready and connected to the other five, lets the mesh settle for 60 s, then
+measures for 300 s. Each phase is timestamped in `events.log`. Change the timing with `STABILIZE_S`, `MEASURE_S`
+and `GRACE_S`, for example `STABILIZE_S=120 make test-scenario1 RUN=x`.
 
 **You should see**
 
-- Every subscriber receives every message
-- Latency stays steady
+- `results/baseline1/delivery_summary.txt` shows about 3000 published messages and `on_time` close to 100% for
+  every subscriber, with p50, p95 and p99 latency per peer
+- No `WARNING restart_counts_changed` line in `events.log`
+- In Grafana, the delivery and latency panels stay flat for the window
 
 ### Isolation and recovery (cut two peers off)
 
@@ -245,6 +256,7 @@ docker images --format '{{.Repository}}:{{.Tag}}' | grep '^gossip/' | xargs dock
 | `make observability` | Prometheus, Grafana, Vector, VictoriaLogs |
 | `make forward` / `make unforward` | Start or stop the port-forwards |
 | `make status` | List the peer pods |
+| `make test-scenario1 RUN=x` | Baseline: wait for a full mesh, settle, measure 300 s |
 | `make test-probe` | Create the probe pod used by `test-verify` |
 | `make test-isolate RUN=x` | Cut `go-peer-2` and `py-peer-2` off |
 | `make test-verify` | Probe TCP reachability across the cut |
@@ -298,3 +310,10 @@ Peers are configured through environment variables in the manifests:
   at its old IP.
 - **The isolated pods are restarted** when the cut is applied, so existing connections are dropped and the cut takes
   effect right away. That shows up as restarts on the process-health panels.
+
+---
+
+## 🤖 AI use
+
+An AI assistant helped with drafts, library lookup, and review. Every result was checked on the cluster. See
+[`AI-USE.md`](AI-USE.md).

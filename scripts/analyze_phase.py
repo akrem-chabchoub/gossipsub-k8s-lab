@@ -81,7 +81,7 @@ def main():
         never = n - len(rec)
         lat.sort()
         print(f"  {peer}: on_time={on_time}/{n} ({100 * on_time / n:.1f}%) late={late} never={never} "
-              f"p50_ms={pct(lat, 0.5):.2f} p99_ms={pct(lat, 0.99):.2f}")
+              f"p50_ms={pct(lat, 0.5):.2f} p95_ms={pct(lat, 0.95):.2f} p99_ms={pct(lat, 0.99):.2f}")
 
 
 if __name__ == "__main__":

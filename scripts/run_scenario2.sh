@@ -32,7 +32,7 @@ scripts/verify_isolation.sh >> "$OUT/verify_after.txt" 2>&1
 sleep 125
 log "post_end"
 
-for p in go-peer-0 go-peer-1 go-peer-2 py-peer-0 py-peer-1 py-peer-2; do
-  kubectl --context "$CTX" -n "$NS" logs "$p" > "$OUT/$p.log" 2>&1
-done
+# Complete logs from the node (rotated files included). `kubectl logs` returns only the current
+# file, which loses receipts once a peer's log passes 10 MiB.
+scripts/collect_logs.sh "$OUT" "$NS" go-peer-0 go-peer-1 go-peer-2 py-peer-0 py-peer-1 py-peer-2 >/dev/null
 log "logs_collected"

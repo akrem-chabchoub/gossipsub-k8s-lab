@@ -72,12 +72,18 @@ test-verify:
 test-recover:
 	scripts/recover.sh $(RESULTS)
 
+# Scenario 1, baseline (about 7 minutes): wait for a full mesh, settle 60 s, measure 300 s,
+# then delivery completeness and latency for the window. NS=gossip-lab measures the six-Go network.
+NS ?= gossip-mixed
+test-scenario1:
+	NS=$(NS) caffeinate -dimsu scripts/run_scenario1.sh $(RUN)
+
 # Full scenario 2 end to end (about 9 minutes), then per-phase delivery analysis.
 test-scenario2:
 	caffeinate -dimsu scripts/run_scenario2.sh $(RUN)
 	scripts/analyze_run.sh $(RUN)
 
-.PHONY: test-probe test-isolate test-verify test-recover test-scenario2
+.PHONY: test-probe test-isolate test-verify test-recover test-scenario1 test-scenario2
 
 # Delete all peer nodes: the six-Go network, the mixed network, and the py-only check.
 # Namespaces are removed, which takes their StatefulSets, Services, pods, probe pod and

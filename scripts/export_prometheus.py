@@ -44,6 +44,7 @@ def main():
     ap.add_argument("--to", dest="t_to", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--step", default="5")
+    ap.add_argument("--namespace", default="gossip-mixed")
     a = ap.parse_args()
     port = free_port()
     pf = subprocess.Popen(["kubectl", "--context", CTX, "-n", "observability", "port-forward",
@@ -53,6 +54,7 @@ def main():
         time.sleep(4)
         rows = []
         for name, q in QUERIES.items():
+            q = q.replace('namespace="gossip-mixed"', f'namespace="{a.namespace}"')
             params = urllib.parse.urlencode({"query": q, "start": a.t_from, "end": a.t_to, "step": a.step})
             data = json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/api/v1/query_range?{params}", timeout=60))
             for series in data["data"]["result"]:
