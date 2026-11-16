@@ -1,0 +1,25 @@
+# Local run state written by scripts (port-forward PIDs and logs)
+.run/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Go
+apps/go-peer/bin/
+.env
+
+# Docker build leftovers and tarballs created while debugging
+*.tar
+*.tar.gz
+
+# macOS
+.DS_Store
+
+# Personal notes and working drafts
+local/
+
+# Raw experiment output (logs, CSV exports, alert state); the reports summarize it
+results/
