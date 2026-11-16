@@ -1,4 +1,4 @@
-# GossipSub Lab
+# gossipsub-k8s-lab
 
 An observable [GossipSub](https://github.com/libp2p/specs/tree/master/pubsub/gossipsub) network on Kubernetes.
 Six peers share one topic, one of them publishes, and every receipt is measured. You can cut two peers off with a
