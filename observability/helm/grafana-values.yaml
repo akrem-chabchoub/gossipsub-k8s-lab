@@ -1,0 +1,90 @@
+# Grafana (chart grafana/grafana 10.5.15, app 12.3.1). Everything is provisioned from files:
+# datasource, dashboard provider + dashboard (ConfigMap gossip-lab-dashboards), and alert rules.
+# Lab-only admin credentials.
+adminUser: admin
+adminPassword: lab-admin
+persistence:
+  enabled: false
+# No plugin downloads at start-up: the lab needs only the built-in Prometheus datasource.
+plugins: []
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        url: http://prometheus-server.observability.svc.cluster.local
+        access: proxy
+        isDefault: true
+        jsonData:
+          timeInterval: 5s
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: gossip-lab
+        orgId: 1
+        folder: GossipSub Lab
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/gossip-lab
+dashboardsConfigMaps:
+  gossip-lab: gossip-lab-dashboards
+alerting:
+  rules.yaml:
+    apiVersion: 1
+    groups:
+      - orgId: 1
+        name: gossipsub-connectivity
+        folder: GossipSub Lab
+        interval: 10s
+        rules:
+          - uid: connectivity-below-5
+            title: Peer connectivity below 5
+            condition: C
+            for: 60s
+            noDataState: NoData
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: "A peer has fewer than 5 connections for 60s (see namespace label)."
+              description: "min(gossip_connected_peers) < 5. Fires during network isolation and resolves after recovery."
+            data:
+              - refId: A
+                relativeTimeRange: {from: 300, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  expr: 'min by (namespace) (gossip_connected_peers{namespace=~"gossip-lab|gossip-mixed"})'
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+                  instant: false
+              - refId: B
+                relativeTimeRange: {from: 300, to: 0}
+                datasourceUid: __expr__
+                model:
+                  refId: B
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  settings: {mode: dropNN}
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: C
+                relativeTimeRange: {from: 300, to: 0}
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: lt, params: [5]}
+                      operator: {type: and}
+                      query: {params: [C]}
+                      reducer: {type: last, params: []}
+                  intervalMs: 1000
+                  maxDataPoints: 43200

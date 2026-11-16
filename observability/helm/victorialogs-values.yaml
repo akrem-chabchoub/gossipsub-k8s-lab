@@ -1,0 +1,5 @@
+# VictoriaLogs single-node (chart vm/victoria-logs-single 0.13.13, app v1.54.0).
+server:
+  retentionPeriod: 2d
+  persistentVolume:
+    enabled: false
