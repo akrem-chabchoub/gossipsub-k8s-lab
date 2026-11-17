@@ -225,7 +225,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (namespace) (rate(gossip_deliveries_total{namespace=~\"$namespace\",publisher=~\"$publisher\"}[1m])) / (clamp_min(count by (namespace) (gossip_build_info{namespace=~\"$namespace\"}) - 1, 1) * sum by (namespace) (rate(gossip_publish_success_total{namespace=~\"$namespace\",peer=~\"$publisher\"}[1m])))",
+          "expr": "sum by (namespace) (rate(gossip_deliveries_total{namespace=~\"$namespace\",publisher=~\"$publisher\"}[1m])) / (clamp_min(sum by (namespace) (kube_statefulset_replicas{namespace=~\"$namespace\"}) - 1, 1) * sum by (namespace) (rate(gossip_publish_success_total{namespace=~\"$namespace\",peer=~\"$publisher\"}[1m])))",
           "legendFormat": "{{namespace}}",
           "refId": "A"
         }
@@ -236,7 +236,7 @@
         "w": 12,
         "h": 8
       },
-      "description": "Question: Are messages reaching subscribers?\n\nExpected deliveries = publish rate x (subscribers - 1). Subscribers = peers in namespace minus publisher. The denominator is fixed during isolation, so isolated peers reduce completeness (tradeoffs.md D3).",
+      "description": "Question: Are messages reaching subscribers?\n\nExpected deliveries = publish rate x subscribers, where subscribers = desired StatefulSet replicas in the namespace minus the publisher (kube-state-metrics). The denominator comes from the desired replica count, not from the peers being scraped, so a crashed or isolated peer lowers completeness instead of shrinking the expectation (REPORT.md, decision D3).",
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit"

@@ -1,5 +1,5 @@
 # Single-node cluster: all pods share one host clock, so publish-to-receive
-# latency is comparable across peers (see tradeoffs.md, latency assumption).
+# latency is comparable across peers (see REPORT.md, "Measurement assumptions").
 # Default CNI is disabled because kindnet does not enforce NetworkPolicy.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
