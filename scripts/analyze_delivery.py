@@ -1,9 +1,12 @@
 """Delivery analysis from structured peer logs (one JSON object per line).
 
+Superseded by analyze_phase.py, which the scenario scripts use (per-phase windows, merged per-peer logs).
+Kept for ad-hoc checks over a whole run.
+
 Usage:
   python3 scripts/analyze_delivery.py --publisher go-peer-0 --window-s 60 LOG [LOG...]
 
-Each LOG is the captured stdout of one peer (kubectl logs). The publisher's
+Each LOG is one peer's JSON log, as written by scripts/collect_logs.sh (`kubectl logs` misses rotated files). The publisher's
 `publish` events define the denominator. For each subscriber log, the script
 reports unique delivered seqs for the chosen run, completeness over the whole run
 and over the last --window-s seconds, and receive latency percentiles.

@@ -260,7 +260,8 @@ func receiveLoop(ctx context.Context, sub *pubsub.Subscription, selfID peer.ID,
 
 func publishLoop(ctx context.Context, cfg Config, topic *pubsub.Topic, selfID peer.ID,
 	m *Metrics, logger *slog.Logger) {
-	// Wait for at least one mesh peer before publishing.
+	// Wait until at least one peer has subscribed to the topic. ListPeers returns topic subscribers, not
+	// mesh members; the Python peer waits for a mesh member instead.
 	for len(topic.ListPeers()) == 0 {
 		select {
 		case <-ctx.Done():

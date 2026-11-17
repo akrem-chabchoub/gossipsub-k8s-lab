@@ -14,8 +14,9 @@ with a NetworkPolicy for about 4.5 minutes and then reconnected.
 - **Recovery:** both peers reconnected to all four others within about 1.5 s of the policy being removed, and new
   messages were back to 100%.
 - **Missed messages:** about 60% of the messages published during the cut arrived in one burst 1–6 s after recovery.
-  The other 40%, the oldest part of the cut, never arrived. The burst comes from py-libp2p's adaptive heartbeat,
-  explained in [Section 4.3](#43-why-some-missed-messages-arrive-after-recovery-and-the-rest-never-do).
+  The other 40%, the oldest part of the cut, never arrived. The burst is most likely caused by py-libp2p's adaptive
+  heartbeat. The mechanism is in the library source but not yet measured
+  ([Section 4.3](#43-why-some-missed-messages-arrive-after-recovery-and-the-rest-never-do)).
 
 Evidence is in `results/<run>/`. That directory is git-ignored, so the numbers and excerpts below are copied from it,
 and the commands in [Section 8](#8-reproduce) regenerate everything.
@@ -135,7 +136,8 @@ py-peer-2.
 Latency for the non-isolated subscribers stayed at baseline levels during the cut. For example, go-peer-1 had a
 p99 of 7.63 ms.
 
-**Connectivity** (Prometheus `gossip_connected_peers`, and the peers' connect logs):
+**Connectivity** (Prometheus `gossip_connected_peers` for the current pods' IPs only, see Section 7, and the peers'
+connect logs):
 
 - During the cut, `go-peer-2` and `py-peer-2` had 1 connection each (to each other). The other four had 3.
 - After the policy was removed, `go-peer-2` logged connections to go-peer-1, go-peer-0, py-peer-1 and py-peer-0
@@ -180,8 +182,9 @@ All 56 checks during the cut and all 7 after it passed (`verify_during.txt`, `ve
 
 **What the logs show (confirmed).** In `report-isolation` the cut covered seq 9806–12484.
 
-- After recovery, both isolated peers received exactly one contiguous block, seq 10870–12484. That is the last
-  161 s of the cut.
+- After recovery, both isolated peers received messages only from one range, seq 10870–12484, which is the last
+  161 s of the cut. py-peer-2 received all 1615 of them. go-peer-2 received 1603; 12 messages inside the range never
+  reached it (seq 11807–11808, 12247–12251, 12253, 12320–12323).
 - The first 107 s of the cut (seq 9806–10869, 1064 messages) never arrived.
 - The oldest backfilled message was 164 s old when it arrived.
 - Python peers sent most of the burst. For go-peer-2, `fromName` (the peer that forwarded each message) was:
@@ -232,7 +235,8 @@ should shrink to a few seconds of messages.
 The rule is **"Peer connectivity below 5"**:
 
 - It is provisioned from `observability/helm/grafana-values.yaml` in the folder "GossipSub Lab".
-- Expression: `min by (namespace) (gossip_connected_peers)` below 5, held for 60 s and evaluated every 10 s.
+- Expression: `min by (namespace) (gossip_connected_peers{namespace=~"gossip-lab|gossip-mixed"})` below 5, held for
+  60 s and evaluated every 10 s.
 - It uses the reducer `last` (D13). The earlier `min` over the 5-minute window kept the alert firing for up to
   5 minutes after recovery.
 
@@ -249,9 +253,13 @@ implementations in both directions:
 
 - **Go to Python:** in the mixed baseline, the Go publisher's 2999 messages reached all three Python peers, 100%
   on time.
-- **Python to Go:** Python peers also forward to Go peers. In the baseline, go-peer-1 and go-peer-2 got 19 and 10
-  messages first from a Python peer. After the cut, go-peer-2 received 1423 backfilled messages from py-peer-0 and
-  py-peer-1.
+- **Python to Go, and Go to Python beyond the publisher:** in the 300 s baseline window, `fromName` (the peer that
+  delivered each message first) shows:
+  - go-peer-1 and go-peer-2 received 11 and 8 messages first from a Python peer;
+  - the Python peers received 58–99 messages each first from go-peer-1 and 58–99 from go-peer-2.
+
+  The publisher is directly meshed with every peer, so most first copies come from it. After the cut, go-peer-2
+  received 1423 backfilled messages from py-peer-0 and py-peer-1.
 - **Before Kubernetes:** a localhost check passed 20 of 20 messages Go to Python and 20 of 20 Python to Go. That
   result is from the author's notes; its logs were not kept.
 - **Discovery:** both implementations derive the same peer ID from a peer's name, and they find each other through
@@ -294,8 +302,10 @@ _time:2h runId:20261117T114911Z seq:5000 (event:receive or event:publish)
 
 - **Small sample.** Two baselines (one per network) and three isolation runs. There are no confidence intervals, and
   the late/never split varies between runs (1603/1076 versus 1733/926).
-- **The isolated peers are restarted.** The restart window (7–9 s) is reported as its own phase. Messages published
-  in it are mostly lost, and the dashboard counts two restarts per run.
+- **The isolated peers are restarted.** The restart window (9 s in `report-isolation`) is reported as its own phase.
+  Messages published in it are mostly lost, and the dashboard counts two restarts per run. The old pods' logs are
+  saved about 1 s before the pods are deleted, so receipts in that last second are missing. The restart-phase
+  delivery numbers are therefore a lower bound.
 - **One node and one clock.** Latency doesn't account for real network distance or cross-node clock skew.
 - **Python peer settings are non-default** (items 1–3 in Section 6), and py-libp2p changes its own heartbeat under
   stress (item 6). Both are part of the result.
@@ -304,8 +314,10 @@ _time:2h runId:20261117T114911Z seq:5000 (event:receive or event:publish)
   - Prometheus held samples from the old pods stamped up to 12:25:05, and returned them as live series until about
     12:30.
   - Grafana's alert scheduler showed its last evaluation at 12:25:00 and did not evaluate the rule until then.
-  - So `report-isolation` has valid delivery, log and probe evidence, but its alert samples and `prometheus.csv` are
-    not usable. The ghost series can be told apart by their `instance` IP.
+  - So in `report-isolation` the delivery, log and probe evidence is valid, and so are the per-pod series in
+    `prometheus.csv` for the current pods. The ghost series have their own `instance` IPs, and the connectivity
+    numbers in Section 4.2 use only the current pods' IPs. Its alert samples, and any aggregate across pods (counts,
+    sums by pod name), are not usable.
   - `report-isolation-2` ran after 12:31 for clean metrics and alert evidence.
 - **Readiness** (`/healthz`) becomes ready once the peer is subscribed, and never goes unready if the peer loses its
   connections.
@@ -318,7 +330,7 @@ _time:2h runId:20261117T114911Z seq:5000 (event:receive or event:publish)
 make up                                            # cluster, images, both networks, observability, port-forwards
 make test-scenario1 RUN=baseline-mixed             # mixed baseline, about 7 min
 make test-scenario1 RUN=baseline-go NS=gossip-lab  # six-Go baseline
-make test-scenario2 RUN=isolation                  # isolation and recovery, about 10 min, with analysis
+make test-scenario2 RUN=isolation                  # isolation and recovery, about 9 min, with analysis
 cat results/isolation/delivery_summary.txt results/isolation/verify_during.txt
 make unforward && make delete-peers                # clean up (make down removes the cluster)
 ```
@@ -333,10 +345,10 @@ Grafana is at http://localhost:3100 (dashboard "GossipSub lab"). VictoriaLogs is
 | D2 | Baseline thresholds set before the first run: completeness ≥ 99.9%, p99 ≤ 250 ms |
 | D3 | Completeness keeps a fixed denominator during isolation, so the loss stays visible |
 | D4 | One required alert (connectivity); missing telemetry shown on the dashboard |
-| D5 | Deletes limited to labelled lab objects in the lab namespaces |
+| D5 | Deletes limited to labelled lab objects in the lab namespaces; a labelled deny policy confirmed that Calico enforces NetworkPolicy |
 | D6 | Every command passes `--context kind-gossip-lab` |
 | D7 | Vector reads `/var/log/pods` with a `file` source |
-| D8 | Isolate one Go and one Python peer (`go-peer-2`, `py-peer-2`), never the publisher |
+| D8 | Isolate one Go and one Python peer (`go-peer-2`, `py-peer-2`), never the publisher; verify the cut with TCP probes, connection counts and telemetry, not the policy object |
 | D9 | A labelled busybox probe pod for reachability checks |
 | D10 | Recovery expectations recorded as hypotheses before the runs |
 | D11 | Restart the isolated pods under the policy so existing connections are dropped |

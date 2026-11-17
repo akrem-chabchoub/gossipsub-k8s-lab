@@ -16,6 +16,7 @@ cuts two peers off with a NetworkPolicy and measures delivery, connectivity, and
 | Status | `make status` |
 | Go tests | `cd apps/go-peer && go vet ./... && go test ./...` |
 | Python tests | see below |
+| Analysis tests | `python3 -m unittest discover -s scripts/tests` |
 | Shell syntax | `for f in scripts/*.sh; do bash -n "$f"; done` |
 | Dry-run Make | `make -n <target>` |
 | Isolation test | `make test-isolate RUN=x`, `make test-verify`, `make test-recover RUN=x` |
@@ -73,7 +74,8 @@ Before finishing a change, run the tests for every part you touched, and the she
 - **The alert reducer is `last`.** Using `min` over the 5-minute window keeps the alert firing for about 5 minutes after
   recovery.
 - **py-libp2p overrides the 1 s heartbeat under stress.** Its adaptive gossip (on by default) switches to 30 s or
-  60 s heartbeats when peers are lost. This causes the post-recovery backfill burst (REPORT.md, Section 4.3).
+  60 s heartbeats when peers are lost. This is the likely cause of the post-recovery backfill burst; the interval is
+  not measured yet (REPORT.md, Section 4.3).
 - **A Docker VM clock correction poisons Prometheus and Grafana.** If pod ages show `<invalid>`, the node clock was
   ahead. Prometheus then holds future-stamped samples from old pods, and Grafana's alert scheduler waits for its
   future "last evaluation" time. Check `max(timestamp(up))` and the rule's `lastEvaluation` before trusting metrics.

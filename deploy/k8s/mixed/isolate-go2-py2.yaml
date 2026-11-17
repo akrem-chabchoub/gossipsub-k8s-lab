@@ -1,6 +1,6 @@
 # Scenario 2 (decision D8): isolate go-peer-2 and py-peer-2 from the rest of gossip-mixed.
 # The two isolated peers may still talk to each other. Telemetry (observability namespace)
-# and DNS stay reachable so the failure is observable. Applied and removed by scripts/isolate.sh.
+# and DNS stay reachable so the failure is observable. Applied by scripts/isolate.sh, removed by scripts/recover.sh.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

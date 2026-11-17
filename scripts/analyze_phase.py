@@ -10,12 +10,13 @@ For each subscriber, the script reports:
   - on_time: received by to + grace
   - late: received after to + grace, with the window those late receipts arrived in
   - never: not received in the logs supplied
-  - latency p50 / p95 / p99 of the on-time receipts
+  - latency p50 / p95 / p99 of the on-time receipts, leaving out clock-skewed receipts (received before published),
+    which the peers log with latencyMs 0
 Use --grace-s 0 for a phase that ends with a change of network state (the isolation phase ends
 when the policy is removed): any grace would count receipts after recovery as on time.
 
 Several files may belong to one peer (for example the logs saved before a pod restart and the
-logs of the new pod); they are merged by the "peer" field, keeping the first receipt per seq.
+logs of the new pod); they are merged by the "peer" field, keeping the earliest receipt per seq.
 Receipts come from JSON lines with event == "receive" and the given runId.
 Exit status 1 if the phase contains no published messages: an empty phase is not a result.
 """
@@ -90,12 +91,15 @@ def main():
         rec = {}
         for e in by_peer[peer]:
             if e.get("event") == "receive" and e.get("runId") == args.run and e.get("seq") in seqs:
-                rec.setdefault(e["seq"], e)  # first receipt
+                prev = rec.get(e["seq"])
+                if prev is None or e["receivedAtNs"] < prev["receivedAtNs"]:
+                    rec[e["seq"]] = e
         on_time, lat, late = 0, [], []
         for e in rec.values():
             if e["receivedAtNs"] <= t1 + grace:
                 on_time += 1
-                lat.append(e["latencyMs"])
+                if e["receivedAtNs"] >= e["publishedAtNs"]:
+                    lat.append(e["latencyMs"])
             else:
                 late.append(e["receivedAtNs"])
         never = n - len(rec)

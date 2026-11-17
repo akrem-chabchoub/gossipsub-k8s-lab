@@ -51,8 +51,8 @@ minutes. On reconnect, py-libp2p pushes that cache to the newly subscribed peers
 - **Workload sweep.** Rates of 1, 10, 50 and 100 msg/s, with payloads of 1, 16 and 64 KiB. Find where py-libp2p starts
   dropping messages, and record CPU and memory at each step.
 - **Soak test.** One hour of baseline to catch memory growth and log rotation problems.
-- **Tests for the analysis code.** Unit tests for `analyze_phase.py` and `analyze_delivery.py`, using small fixture
-  logs, so a change to the analysis can't silently change the results.
+- **Tests for the analysis code.** `analyze_phase.py` has fixture tests (`scripts/tests`). Extend them to
+  `analyze_run.sh` end to end, with a fixture run directory.
 - **CI.** A GitHub Actions job that creates the kind cluster, runs a short scenario (2 msg/s, 60 s cut), runs the
   assertions, and uploads `results/` as an artifact.
 
