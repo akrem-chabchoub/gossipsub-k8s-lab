@@ -26,7 +26,7 @@ Python tests need the peer's dependencies, which are only in the image. Run them
 ```bash
 docker run --rm \
   -v "$PWD/apps/py-peer/peer:/app/peer:ro" -v "$PWD/apps/py-peer/tests:/app/tests:ro" \
-  --entrypoint python gossip/py-peer:0.1.5 -m unittest discover -s tests -t .
+  --entrypoint python gossip/py-peer:0.1.6 -m unittest discover -s tests -t .
 ```
 
 Before finishing a change, run the tests for every part you touched, and the shell syntax check for any script.
@@ -60,7 +60,7 @@ Before finishing a change, run the tests for every part you touched, and the she
 - **The kind node pulls images slowly.** `scripts/cluster-up.sh` and `scripts/observability-up.sh` pull images on the
   host and import them into the node with `ctr`. `kind load docker-image` fails on these multi-platform images.
 - **`make build` can fail** with `auth.docker.io: i/o timeout` when Docker Desktop's DNS is broken, even if the host
-  resolves names. Reuse existing images with `kind load docker-image gossip/go-peer:0.1.1 gossip/py-peer:0.1.5
+  resolves names. Reuse existing images with `kind load docker-image gossip/go-peer:0.1.2 gossip/py-peer:0.1.6
   --name gossip-lab`.
 - **Port 3000 belongs to another Grafana** on this machine. The lab's Grafana is on 3100.
 - **py-libp2p needs non-default settings** at 10 msg/s: a 1 s heartbeat, a raised per-topic rate limit, and a one-way
@@ -72,6 +72,12 @@ Before finishing a change, run the tests for every part you touched, and the she
   `make test-isolate` restarts `go-peer-2` and `py-peer-2`.
 - **The alert reducer is `last`.** Using `min` over the 5-minute window keeps the alert firing for about 5 minutes after
   recovery.
+- **py-libp2p overrides the 1 s heartbeat under stress.** Its adaptive gossip (on by default) switches to 30 s or
+  60 s heartbeats when peers are lost. This causes the post-recovery backfill burst (REPORT.md, Section 4.3).
+- **A Docker VM clock correction poisons Prometheus and Grafana.** If pod ages show `<invalid>`, the node clock was
+  ahead. Prometheus then holds future-stamped samples from old pods, and Grafana's alert scheduler waits for its
+  future "last evaluation" time. Check `max(timestamp(up))` and the rule's `lastEvaluation` before trusting metrics.
+- **`make test-verify` takes `MODE=during|after`** and exits non-zero when a probe does not match.
 - **Latency assumes one host clock.** All pods run on one kind node. Do not compare latency across machines.
 
 ## Layout

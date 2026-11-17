@@ -11,6 +11,9 @@ Two libp2p implementations run in the same mesh:
 | Primary | Go: go-libp2p + go-libp2p-pubsub | v0.51.0 / v0.19.0 |
 | Second | Python: py-libp2p | 0.8.1 |
 
+**Results:** [`REPORT.md`](REPORT.md) has the measured baseline, the isolation and recovery results, the alert
+evidence, the mixed-network integration notes, limitations, and next steps.
+
 ---
 
 ## 🧭 Architecture
@@ -133,7 +136,7 @@ make build
 
 **You should see**
 
-- `gossip/go-peer:0.1.1` and `gossip/py-peer:0.1.5` are built and loaded into kind
+- `gossip/go-peer:0.1.2` and `gossip/py-peer:0.1.6` are built and loaded into kind
 
 <details>
 <summary>Build fails with <code>auth.docker.io: i/o timeout</code>?</summary>
@@ -142,7 +145,7 @@ Docker Desktop's DNS can fail even when your machine resolves names fine. If the
 load them and skip the build:
 
 ```bash
-kind load docker-image gossip/go-peer:0.1.1 gossip/py-peer:0.1.5 --name gossip-lab
+kind load docker-image gossip/go-peer:0.1.2 gossip/py-peer:0.1.6 --name gossip-lab
 ```
 </details>
 
@@ -218,22 +221,27 @@ make test-scenario2 RUN=my-run
 **Or step by step**, watching Grafana as you go:
 
 ```bash
-make test-probe                # create the probe pod (once)
-make test-verify               # before the cut: every probe OK
+make test-verify MODE=after    # before the cut: every probe OK (creates the probe pod)
 make test-isolate RUN=my-run   # apply the policy, restart go-peer-2 and py-peer-2
-make test-verify               # during the cut: probes across the cut FAIL
+make test-verify               # during the cut: probes across the cut FAIL, inside the pair OK
 make test-recover RUN=my-run   # remove the policy
-make test-verify               # after recovery: every probe OK
+make test-verify MODE=after    # after recovery: every probe OK
 ```
+
+`make test-verify` exits non-zero if any probe does not match the expectation for `MODE`.
 
 **You should see**
 
 - During the cut, `go-peer-2` and `py-peer-2` drop to 1 connection; the other four drop to 3
 - After recovery, all six peers return to 5 connections
 - `results/my-run/events.log` records when isolation started and ended
+- `results/my-run/delivery_summary.txt` reports four phases: pre-isolation, restart, isolation, recovery
+- `verify_during.txt` and `verify_after.txt` show `PASS` on every line
 
-The probes check real TCP reachability on the GossipSub port, so they prove the cut works beyond the NetworkPolicy
-object existing.
+The probes check real TCP reachability on the GossipSub port in both directions (from a pod outside the cut, and from
+`py-peer-2` inside it), so they prove the cut works beyond the NetworkPolicy object existing.
+
+The measured results, and what they mean, are in [`REPORT.md`](REPORT.md).
 
 ### 🔔 The alert
 
