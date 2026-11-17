@@ -1,8 +1,7 @@
 CLUSTER  ?= gossip-lab
 CTX      := kind-$(CLUSTER)
-GO_IMG   := gossip/go-peer:0.1.1
-PY_IMG   := gossip/py-peer:0.1.5
-CALICO   := https://raw.githubusercontent.com/projectcalico/calico/v3.30.3/manifests/calico.yaml
+GO_IMG   := gossip/go-peer:0.1.2
+PY_IMG   := gossip/py-peer:0.1.6
 
 .PHONY: up cluster-up build deploy-go-only py-check deploy-mixed status down observability
 
@@ -64,9 +63,12 @@ test-isolate:
 	kubectl --context $(CTX) -n $(NS_MIXED) delete pod go-peer-2 py-peer-2
 	kubectl --context $(CTX) -n $(NS_MIXED) wait --for=condition=Ready pod/go-peer-2 pod/py-peer-2 --timeout=240s
 
-# Probe the cut: expected FAIL between isolated and non-isolated peers, OK inside each group.
-test-verify:
-	scripts/verify_isolation.sh
+# Probe the cut with real TCP connects and compare with the expectation for MODE:
+# during = FAIL between isolated and non-isolated peers, OK inside each group; after = all OK.
+# Exits non-zero on any mismatch.
+MODE ?= during
+test-verify: test-probe
+	scripts/verify_isolation.sh $(MODE)
 
 # Remove the isolation policy and record the end time.
 test-recover:

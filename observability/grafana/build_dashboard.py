@@ -51,11 +51,13 @@ panels.append(panel("Unique deliveries per subscriber (per second)", "Are messag
     unit="ops", description="Deduplicated by (publisher, seq). Each subscriber should show about PUBLISH_RATE.", y=y, x=0, w=12))
 panels.append(panel("Delivery completeness (fraction of expected)", "Are messages reaching subscribers?",
     [(f'sum by (namespace) (rate(gossip_deliveries_total{{{NS},{PUB}}}[1m])) / '
-      f'(clamp_min(count by (namespace) (gossip_build_info{{{NS}}}) - 1, 1) * '
+      f'(clamp_min(sum by (namespace) (kube_statefulset_replicas{{{NS}}}) - 1, 1) * '
       f'sum by (namespace) (rate(gossip_publish_success_total{{{NS},peer=~"$publisher"}}[1m])))', "{{namespace}}")],
     unit="percentunit",
-    description="Expected deliveries = publish rate x (subscribers - 1). Subscribers = peers in namespace minus publisher. "
-                "The denominator is fixed during isolation, so isolated peers reduce completeness (tradeoffs.md D3).",
+    description="Expected deliveries = publish rate x subscribers, where subscribers = desired StatefulSet replicas "
+                "in the namespace minus the publisher (kube-state-metrics). The denominator comes from the desired "
+                "replica count, not from the peers being scraped, so a crashed or isolated peer lowers completeness "
+                "instead of shrinking the expectation (REPORT.md, decision D3).",
     y=y, x=12, w=12))
 y += 8
 panels.append(row("3. Is propagation slowing down?", y)); y += 1

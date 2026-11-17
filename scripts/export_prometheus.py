@@ -4,6 +4,8 @@ Usage: python3 scripts/export_prometheus.py --from ISO --to ISO --out results/DI
 
 Starts a port-forward to the observability Prometheus service (kind-gossip-lab context),
 queries query_range, and stops only the port-forward it started.
+Exit status 1 if Prometheus reports an error or returns no samples at all for the window
+(Prometheus has no persistent storage here, so a restart loses older data).
 """
 import argparse
 import csv
@@ -12,6 +14,7 @@ import json
 import os
 import socket
 import subprocess
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -51,12 +54,20 @@ def main():
                            "svc/prometheus-server", f"{port}:80"],
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        time.sleep(4)
+        base = f"http://127.0.0.1:{port}"
+        for _ in range(30):  # wait for the port-forward instead of a fixed sleep
+            try:
+                urllib.request.urlopen(f"{base}/-/ready", timeout=2)
+                break
+            except OSError:
+                time.sleep(0.5)
         rows = []
         for name, q in QUERIES.items():
             q = q.replace('namespace="gossip-mixed"', f'namespace="{a.namespace}"')
             params = urllib.parse.urlencode({"query": q, "start": a.t_from, "end": a.t_to, "step": a.step})
-            data = json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/api/v1/query_range?{params}", timeout=60))
+            data = json.load(urllib.request.urlopen(f"{base}/api/v1/query_range?{params}", timeout=60))
+            if data.get("status") != "success":
+                sys.exit(f"export_prometheus: {name}: {data.get('error', data)}")
             for series in data["data"]["result"]:
                 labels = ",".join(f'{k}={v}' for k, v in sorted(series["metric"].items()) if k != "__name__")
                 for ts, val in series["values"]:
@@ -68,6 +79,8 @@ def main():
             w.writerow(["time_utc", "metric", "labels", "value"])
             w.writerows(rows)
         print(f"wrote {len(rows)} rows to {a.out}")
+        if not rows:
+            sys.exit("export_prometheus: no samples in the window (Prometheus restarted, or wrong window?)")
     finally:
         pf.terminate()
 

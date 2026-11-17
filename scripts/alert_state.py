@@ -30,7 +30,12 @@ def main():
     pf = subprocess.Popen(["kubectl", "--context", CTX, "-n", "observability", "port-forward",
                            "svc/grafana", f"{port}:80"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        time.sleep(4)
+        for _ in range(30):  # wait for the port-forward instead of a fixed sleep
+            try:
+                urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=2)
+                break
+            except OSError:
+                time.sleep(0.5)
         req = urllib.request.Request(f"http://127.0.0.1:{port}/api/prometheus/grafana/api/v1/rules",
                                      headers={"Authorization": AUTH})
         data = json.load(urllib.request.urlopen(req, timeout=30))

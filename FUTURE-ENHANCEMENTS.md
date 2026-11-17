@@ -1,7 +1,7 @@
 # Future enhancements
 
-The lab covers everything the brief asks for. These are the next steps I would take, grouped by area and ranked at
-the end. The three with the most value:
+These are the next steps I would take, grouped by area and ranked at the end. Results and open findings are in
+[`REPORT.md`](REPORT.md). The three with the most value:
 
 1. Repeat each scenario several times and turn the results into automatic pass/fail checks.
 2. Cut peers off without restarting their pods.
@@ -11,20 +11,17 @@ the end. The three with the most value:
 
 | Finding | Evidence today | Next step |
 |---|---|---|
-| Messages published during the cut: 36–39% never reach the isolated peers | Full run: go-peer-2 got 64.4%, py-peer-2 got 60.3% | Expected, if confirmed (see below) |
-| The messages that do arrive are very late | p50 83–90 s, p99 173 s | Find which peer delivered them, using `fromName` in the receipt logs |
-| Run 6 lost nothing during the cut, but the full run lost about 38% | Two runs that disagree | Repeat runs (see Better tests) |
-| In the first run, Go peers connected to the isolated peers | Connection counts | Re-test with the conntrack method below, which keeps the same processes |
+| About 60% of the messages missed during the cut arrive in one burst 1–6 s after recovery; the oldest ~40% never arrive | Three runs, same pattern (REPORT.md, Section 4.2) | Confirm the cause below |
+| The burst is the last ~160 s of the cut, sent by the Python peers only | `fromName` on the late receipts | Rerun with py-libp2p's `adaptive_gossip_enabled=False` |
+| Python subscribers have a ~4 ms median latency against ~1 ms for Go | Baseline (REPORT.md, Section 3) | Profile the Python receive path |
 
-**Hypothesis for the lost messages (not confirmed):** GossipSub doesn't store messages and replay them later. A peer can
-recover a missed message only through gossip: a neighbour announces the message ID (IHAVE), and the peer asks for it
-(IWANT). Neighbours announce only IDs from the last few heartbeats, about 3 s at the lab's 1 s heartbeat. A peer that
-was cut off for 4 minutes can't recover messages older than that, so most of them never arrive. To check it:
+**Hypothesis for the burst (mechanism confirmed in the library source, not measured):** py-libp2p 0.8.1 overrides
+the configured 1 s heartbeat with 30 s or 60 s when its network-health score drops. The cut costs the non-isolated
+Python peers two of five connections, so their message cache, which advances once per heartbeat, stretches to
+minutes. On reconnect, py-libp2p pushes that cache to the newly subscribed peers. To check it:
 
-- List the receipts with latency above 5 s, grouped by `fromName` and arrival time. If they all arrive in one burst
-  right after recovery, look for a queue or buffer on the sending side.
-- Repeat with a longer gossip history (`HistoryLength` and `HistoryGossip` in go-libp2p-pubsub), and check whether
-  the share of late messages grows.
+- Rerun scenario 2 with `adaptive_gossip_enabled=False`. The backfilled block should shrink to a few seconds.
+- Run the same cut on the six-Go network. Only about 3 s of messages (the gossip window) should come back.
 
 ## Better tests
 
@@ -133,14 +130,14 @@ Today, alerts only show in Grafana. No contact point is configured.
   during the build.
 - **A multi-node kind cluster**, so traffic crosses nodes and Calico's routing is part of the test. Latency then
   needs clock-skew checks between nodes; `gossip_clock_skew_events_total` already exists for that.
-- **Hash-pinned Python dependencies** (`pip install --require-hashes`).
+- **Hash-pinned Python dependencies** (`pip install --require-hashes`); today `requirements.lock` pins versions only.
 
 ## Priority
 
 | # | Enhancement | Value | Effort |
 |---|---|---|---|
 | 1 | Pass/fail assertions plus 5 repeat runs per scenario | High: turns single runs into evidence | Medium |
-| 2 | Explain the late and lost messages (`fromName` query, gossip history test) | High: closes the open finding | Low |
+| 2 | Confirm the adaptive-heartbeat cause of the backfill burst | High: closes the open finding | Low |
 | 3 | Isolation with conntrack instead of a pod restart | High: cleaner experiment, full logs | Low |
 | 4 | Delivery, telemetry-missing and per-peer alerts | High: alerts on what users feel | Low |
 | 5 | Alerts to a phone (Telegram or ntfy) | Medium | Low |

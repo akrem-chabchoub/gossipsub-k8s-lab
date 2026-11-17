@@ -238,15 +238,17 @@ func receiveLoop(ctx context.Context, sub *pubsub.Subscription, selfID peer.ID,
 			continue // own publications are not deliveries
 		}
 		recvNs := time.Now().UnixNano()
-		if dedupe.Seen(pm.PublisherID, pm.Seq) {
+		if dedupe.Seen(pm.RunID, pm.PublisherID, pm.Seq) {
 			m.Duplicates.Inc()
 			continue
 		}
 		latency, ok := LatencySeconds(pm.PublishedNs, recvNs)
-		if !ok {
+		// A skewed sample is counted, not observed: a 0 would pull the low percentiles down.
+		if ok {
+			m.DeliveryLatency.Observe(latency)
+		} else {
 			m.ClockSkew.Inc()
 		}
-		m.DeliveryLatency.Observe(latency)
 		m.Deliveries.WithLabelValues(names[pm.PublisherID]).Inc()
 		m.LastRecvTS.SetToCurrentTime()
 		logger.Info("receive", "event", "receive", "runId", pm.RunID, "publisherId", pm.PublisherID,

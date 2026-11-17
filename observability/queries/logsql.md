@@ -12,8 +12,11 @@ Log fields (from the peer JSON): `event`, `runId`, `peer`, `impl`, `publisherNam
 Which application peers observed message (runId, seq), and when:
 
     _time:1h runId:RUN_ID seq:SEQ event:receive
-      | fields _time, peer, impl, publisherName, latencyMs, fromName
-      | sort by (_time)
+      | fields _time, peer, impl, publisherName, receivedAtNs, latencyMs, fromName
+      | sort by (receivedAtNs)
+
+Sort by `receivedAtNs`, not `_time`: the Python peer's `time` field has whole seconds only. `fromName` is the peer
+that forwarded the message (the first copy received), in both implementations.
 
 Publisher side, for the same message:
 

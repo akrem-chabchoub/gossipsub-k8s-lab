@@ -25,6 +25,12 @@ Nothing was accepted on generated text alone. Each piece was run on the kind clu
     the peerstore. Re-resolving DNS on every dial fixed it.
   - Vector's `kubernetes_logs` source shipped nothing. Querying VictoriaLogs showed this, and I replaced it with a
     `file` source.
+  - A multi-agent review against the brief flagged that the isolation-phase "delivered" figure (64%) counted
+    receipts that arrived after recovery, and that the isolated peers' pre-cut logs were lost when their pods were
+    restarted. I re-read the receipt logs, confirmed both, and changed the analysis (grace 0 for the isolation phase,
+    logs saved before the restart). The corrected figure is 0% during the cut.
+  - The same review said the Python peer's `fromName` was the original author, not the forwarder. I checked the
+    py-libp2p source before changing it.
   - The repository review flagged that `kubectl logs` misses rotated log files. I confirmed it by listing the pod
     log files on the kind node before acting on it.
 - **Claims in the report** are marked as confirmed only when backed by logs, metrics, or command output. Everything

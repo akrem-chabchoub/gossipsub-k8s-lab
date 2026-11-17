@@ -48,7 +48,7 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
         - name: peer
-          image: gossip/go-peer:0.1.1
+          image: gossip/go-peer:0.1.2
           imagePullPolicy: IfNotPresent
           ports:
             - name: libp2p
@@ -127,7 +127,7 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
         - name: peer
-          image: gossip/py-peer:0.1.5
+          image: gossip/py-peer:0.1.6
           imagePullPolicy: IfNotPresent
           ports:
             - {name: libp2p, containerPort: 4001}

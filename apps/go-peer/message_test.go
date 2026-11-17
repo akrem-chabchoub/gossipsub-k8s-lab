@@ -46,14 +46,17 @@ func TestMakePayloadSize(t *testing.T) {
 
 func TestDeduper(t *testing.T) {
 	d := NewDeduper()
-	if d.Seen("p", 1) {
+	if d.Seen("r1", "p", 1) {
 		t.Fatal("first receipt must not be a duplicate")
 	}
-	if !d.Seen("p", 1) {
+	if !d.Seen("r1", "p", 1) {
 		t.Fatal("second receipt must be a duplicate")
 	}
-	if d.Seen("q", 1) {
+	if d.Seen("r1", "q", 1) {
 		t.Fatal("same seq from another publisher is distinct")
+	}
+	if d.Seen("r2", "p", 1) {
+		t.Fatal("same seq in a new run (publisher restart) is distinct")
 	}
 }
 

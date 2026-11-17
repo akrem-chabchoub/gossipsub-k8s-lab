@@ -1,6 +1,6 @@
 # Vector agent (chart vector/vector 0.61.0) ships gossip pod logs to VictoriaLogs.
 # Source: CRI log files of the gossip namespaces, read directly from /var/log/pods.
-# The kubernetes_logs source emitted nothing in this kind setup (see tradeoffs.md D7).
+# The kubernetes_logs source emitted nothing in this kind setup (see REPORT.md, decision D7).
 role: Agent
 service:
   enabled: false
