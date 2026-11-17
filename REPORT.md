@@ -235,7 +235,8 @@ should shrink to a few seconds of messages.
 The rule is **"Peer connectivity below 5"**:
 
 - It is provisioned from `observability/helm/grafana-values.yaml` in the folder "GossipSub Lab".
-- Expression: `min by (namespace) (gossip_connected_peers)` below 5, held for 60 s and evaluated every 10 s.
+- Expression: `min by (namespace) (gossip_connected_peers{namespace=~"gossip-lab|gossip-mixed"})` below 5, held for
+  60 s and evaluated every 10 s.
 - It uses the reducer `last` (D13). The earlier `min` over the 5-minute window kept the alert firing for up to
   5 minutes after recovery.
 
@@ -329,7 +330,7 @@ _time:2h runId:20261117T114911Z seq:5000 (event:receive or event:publish)
 make up                                            # cluster, images, both networks, observability, port-forwards
 make test-scenario1 RUN=baseline-mixed             # mixed baseline, about 7 min
 make test-scenario1 RUN=baseline-go NS=gossip-lab  # six-Go baseline
-make test-scenario2 RUN=isolation                  # isolation and recovery, about 10 min, with analysis
+make test-scenario2 RUN=isolation                  # isolation and recovery, about 9 min, with analysis
 cat results/isolation/delivery_summary.txt results/isolation/verify_during.txt
 make unforward && make delete-peers                # clean up (make down removes the cluster)
 ```
@@ -344,10 +345,10 @@ Grafana is at http://localhost:3100 (dashboard "GossipSub lab"). VictoriaLogs is
 | D2 | Baseline thresholds set before the first run: completeness ≥ 99.9%, p99 ≤ 250 ms |
 | D3 | Completeness keeps a fixed denominator during isolation, so the loss stays visible |
 | D4 | One required alert (connectivity); missing telemetry shown on the dashboard |
-| D5 | Deletes limited to labelled lab objects in the lab namespaces |
+| D5 | Deletes limited to labelled lab objects in the lab namespaces; a labelled deny policy confirmed that Calico enforces NetworkPolicy |
 | D6 | Every command passes `--context kind-gossip-lab` |
 | D7 | Vector reads `/var/log/pods` with a `file` source |
-| D8 | Isolate one Go and one Python peer (`go-peer-2`, `py-peer-2`), never the publisher |
+| D8 | Isolate one Go and one Python peer (`go-peer-2`, `py-peer-2`), never the publisher; verify the cut with TCP probes, connection counts and telemetry, not the policy object |
 | D9 | A labelled busybox probe pod for reachability checks |
 | D10 | Recovery expectations recorded as hypotheses before the runs |
 | D11 | Restart the isolated pods under the policy so existing connections are dropped |

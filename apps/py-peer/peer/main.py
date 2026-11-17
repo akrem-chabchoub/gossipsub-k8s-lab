@@ -119,13 +119,13 @@ async def publish_loop(pubsub, topic, self_id, router, cfg, m):
 
 
 async def resolve_target(addr):
-    """Resolve a /dns4/<name>/tcp/<port>/p2p/<id> target to (peer ID, /ip4 multiaddr with no /p2p).
+    """Resolve a /dns4/<name>/tcp/<port>/p2p/<id> target to (peer ID, /ip4 multiaddr with no /p2p, peer ID string).
 
     Root cause of the Python recovery stall: py-libp2p keeps every address it has ever learned
     for a peer. After a pod restart the peerstore still held the peer's previous IP, which now
     belonged to another lab pod. Dialing that address reached a live libp2p host with a different
     identity and failed with "handshake failed when upgrading to secure connection"
-    (reproduced in-cluster; see REPORT.md, "Mixed network"). Resolving the DNS name on every attempt and clearing
+    (reproduced in-cluster; see REPORT.md, Section 6). Resolving the DNS name on every attempt and clearing
     stored addresses first means only the current pod IP is dialed.
     """
     ma = Multiaddr(addr)
