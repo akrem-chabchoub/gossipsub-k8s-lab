@@ -62,9 +62,35 @@ A second namespace, `gossip-lab`, runs six Go-only peers as the primary-implemen
 
 ## ✅ Prerequisites
 
-- Docker Desktop with at least 8 GB of memory
-- [`kind`](https://kind.sigs.k8s.io/), `kubectl`, `helm`, `python3`, `curl`
-- Network access to Docker Hub, quay.io, registry.k8s.io, and the Helm chart repositories
+| Tool | Tested with | Used for |
+|---|---|---|
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | 28.3 | Builds the images and runs the kind node. Give it at least **8 GB of memory** and 4 CPUs. |
+| [kind](https://kind.sigs.k8s.io/) | 0.31 | The local cluster (Kubernetes 1.34, Calico CNI) |
+| [kubectl](https://kubernetes.io/docs/tasks/tools/) | 1.32 | Everything that talks to the cluster |
+| [Helm](https://helm.sh/) | 3.18 | Prometheus, Grafana, Vector, and VictoriaLogs |
+| GNU Make | 3.81 | The `make` targets |
+| Python 3 | 3.9 | Dashboard generation and result analysis (standard library only, no `pip install`) |
+| `curl` | any | Downloads the Calico manifest |
+| Go *(optional)* | 1.26 | Only to run the Go unit tests on the host. The images build Go inside Docker. |
+
+On macOS, install everything with Homebrew:
+
+```bash
+brew install --cask docker
+brew install kind kubectl helm python@3
+```
+
+`make`, `curl`, and `caffeinate` (used by the test targets to keep the Mac awake) ship with macOS. On Linux, drop
+`caffeinate` from the `test-scenario*` targets in the `Makefile`.
+
+You also need network access to Docker Hub, quay.io, registry.k8s.io, and the Helm chart repositories. Check your
+setup:
+
+```bash
+docker info --format '{{.MemTotal}}' && kind version && kubectl version --client && helm version --short && python3 --version
+```
+
+**You should see** a memory value above 8000000000, then a version line for each tool.
 
 ---
 
