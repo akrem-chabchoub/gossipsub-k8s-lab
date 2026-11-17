@@ -16,6 +16,7 @@ cuts two peers off with a NetworkPolicy and measures delivery, connectivity, and
 | Status | `make status` |
 | Go tests | `cd apps/go-peer && go vet ./... && go test ./...` |
 | Python tests | see below |
+| Analysis tests | `python3 -m unittest discover -s scripts/tests` |
 | Shell syntax | `for f in scripts/*.sh; do bash -n "$f"; done` |
 | Dry-run Make | `make -n <target>` |
 | Isolation test | `make test-isolate RUN=x`, `make test-verify`, `make test-recover RUN=x` |

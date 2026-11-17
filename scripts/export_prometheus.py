@@ -68,6 +68,8 @@ def main():
             data = json.load(urllib.request.urlopen(f"{base}/api/v1/query_range?{params}", timeout=60))
             if data.get("status") != "success":
                 sys.exit(f"export_prometheus: {name}: {data.get('error', data)}")
+            if not data["data"]["result"]:
+                print(f"export_prometheus: WARNING no series for {name}", file=sys.stderr)
             for series in data["data"]["result"]:
                 labels = ",".join(f'{k}={v}' for k, v in sorted(series["metric"].items()) if k != "__name__")
                 for ts, val in series["values"]:

@@ -12,6 +12,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 RUN="${1:?usage: analyze_run.sh RUN_NAME}"; OUT="results/$RUN"
 [ -f "$OUT/events.log" ] || { echo "missing $OUT/events.log" >&2; exit 1; }
+if grep -qE ' (ABORTED|FAILED)' "$OUT/events.log"; then
+  echo "events.log records an aborted or failed run; not analysing it:" >&2
+  grep -E ' (ABORTED|FAILED)' "$OUT/events.log" >&2
+  exit 1
+fi
 
 t() {
   local v; v=$(grep " $1" "$OUT/events.log" | head -1 | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z' || true)
@@ -25,8 +30,17 @@ RUNID=$(grep -oE '"runId": ?"[^"]+"' "$OUT/go-peer-0.log" | tail -1 | grep -oE '
 [ -n "$RUNID" ] || { echo "no runId in $OUT/go-peer-0.log" >&2; exit 1; }
 
 LOGS=()
-for p in go-peer-0 go-peer-1 go-peer-2 py-peer-0 py-peer-1 py-peer-2; do LOGS+=("$OUT/$p.log"); done
-for p in "$OUT"/before-restart/*.log; do [ -f "$p" ] && LOGS+=("$p"); done
+for p in go-peer-0 go-peer-1 go-peer-2 py-peer-0 py-peer-1 py-peer-2; do
+  [ -s "$OUT/$p.log" ] || { echo "missing or empty $OUT/$p.log" >&2; exit 1; }
+  LOGS+=("$OUT/$p.log")
+done
+# Logs of the isolated pods from before their restart. Runs made before this was added have none, and their
+# pre-isolation numbers for go-peer-2 and py-peer-2 are not valid.
+if [ -s "$OUT/before-restart/go-peer-2.log" ] && [ -s "$OUT/before-restart/py-peer-2.log" ]; then
+  LOGS+=("$OUT/before-restart/go-peer-2.log" "$OUT/before-restart/py-peer-2.log")
+else
+  echo "WARNING: no before-restart logs; pre-isolation numbers for go-peer-2 and py-peer-2 are not valid" >&2
+fi
 
 A=(--publisher go-peer-0 --run "$RUNID")
 {

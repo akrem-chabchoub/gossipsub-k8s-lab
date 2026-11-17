@@ -21,7 +21,10 @@
 # Env:   PRE_S=120 ISO_S=240 POST_S=150 WAIT_TIMEOUT_S=300
 set -euo pipefail
 cd "$(dirname "$0")/.."
-RUN="${1:?usage: run_scenario2.sh RUN_NAME}"; OUT="results/$RUN"; mkdir -p "$OUT"
+RUN="${1:?usage: run_scenario2.sh RUN_NAME}"; OUT="results/$RUN"
+# events.log is appended to, and the analysis reads the first marker of each kind: a reused name would mix runs.
+[ ! -e "$OUT/events.log" ] || { echo "$OUT already holds a run; choose a new RUN name" >&2; exit 2; }
+mkdir -p "$OUT"
 CTX=kind-gossip-lab; NS=gossip-mixed
 PRE_S="${PRE_S:-120}"; ISO_S="${ISO_S:-240}"; POST_S="${POST_S:-150}"; WAIT_TIMEOUT_S="${WAIT_TIMEOUT_S:-300}"
 PODS="go-peer-0 go-peer-1 go-peer-2 py-peer-0 py-peer-1 py-peer-2"
@@ -57,8 +60,13 @@ while :; do
 done
 log "mesh_full connections:$status"
 
-# Alert state every 20 s for the fire/resolve evidence.
-( while true; do python3 scripts/alert_state.py >> "$OUT/alert_states.jsonl" 2>> "$OUT/alert_sampler.err"; sleep 20; done ) &
+# Alert state every 20 s for the fire/resolve evidence. The subshell inherits set -e, so a failed
+# sample is recorded and the loop carries on instead of stopping for the rest of the run.
+( while true; do
+    python3 scripts/alert_state.py >> "$OUT/alert_states.jsonl" 2>> "$OUT/alert_sampler.err" \
+      || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) alert_state.py failed" >> "$OUT/alert_sampler.err"
+    sleep 20
+  done ) &
 SAMPLER=$!
 
 log "run_start $RUN pre_s=$PRE_S iso_s=$ISO_S post_s=$POST_S"
@@ -99,5 +107,6 @@ kubectl --context "$CTX" -n "$NS" get pods -o wide > "$OUT/pods_after.txt"
 # shellcheck disable=SC2086
 scripts/collect_logs.sh "$OUT" "$NS" $PODS >/dev/null
 log "logs_collected"
+[ -s "$OUT/alert_states.jsonl" ] || log "WARNING alert_states.jsonl is empty (see alert_sampler.err)"
 [ "$VERIFY_FAILED" = 0 ] || { log "FAILED: an isolation check did not match its expectation"; exit 1; }
 log "done"
