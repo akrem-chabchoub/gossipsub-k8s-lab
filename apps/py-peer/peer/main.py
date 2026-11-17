@@ -3,6 +3,7 @@
 Same env contract, metric names, and JSON log fields as apps/go-peer.
 """
 import json
+import signal
 import socket
 import sys
 import threading
@@ -21,7 +22,7 @@ from prometheus_client import generate_latest
 
 from peer.config import load_config
 from peer.identity import identity_for
-from peer.message import Deduper, Message, decode_message, latency_seconds, make_payload
+from peer.message import Deduper, ForwarderLog, Message, decode_message, latency_seconds, make_payload
 from peer.metrics import Metrics
 
 READY = threading.Event()
@@ -57,10 +58,11 @@ def serve_http(port, registry):
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
-async def receive_loop(sub, self_id, dedupe, m, names):
+async def receive_loop(sub, self_id, dedupe, m, names, forwarders):
     while True:
         msg = await sub.get()
-        from_name = names.get(ID(msg.from_id).to_base58(), ID(msg.from_id).to_base58())
+        # The forwarding peer, not the author (msg.from_id), to match Go's ReceivedFrom.
+        from_name = names.get(forwarders.pop(msg.from_id, msg.seqno), "")
         try:
             pm = decode_message(msg.data)
         except Exception as err:  # noqa: BLE001 - any decode failure is counted and logged
@@ -69,14 +71,16 @@ async def receive_loop(sub, self_id, dedupe, m, names):
             continue
         if pm.publisherId == self_id:
             continue
-        if dedupe.seen(pm.publisherId, pm.seq):
+        if dedupe.seen(pm.runId, pm.publisherId, pm.seq):
             m.duplicates.inc()
             continue
         recv_ns = time.time_ns()
         latency, ok = latency_seconds(pm.publishedAtNs, recv_ns)
-        if not ok:
+        # A skewed sample is counted, not observed: a 0 would pull the low percentiles down.
+        if ok:
+            m.delivery_latency.observe(latency)
+        else:
             m.clock_skew.inc()
-        m.delivery_latency.observe(latency)
         m.deliveries(names.get(pm.publisherId, "")).inc()
         m.last_recv_ts.set_to_current_time()
         log("receive", runId=pm.runId, publisherId=pm.publisherId,
@@ -121,7 +125,7 @@ async def resolve_target(addr):
     for a peer. After a pod restart the peerstore still held the peer's previous IP, which now
     belonged to another lab pod. Dialing that address reached a live libp2p host with a different
     identity and failed with "handshake failed when upgrading to secure connection"
-    (reproduced in-cluster; see REPORT.md). Resolving the DNS name on every attempt and clearing
+    (reproduced in-cluster; see REPORT.md, "Mixed network"). Resolving the DNS name on every attempt and clearing
     stored addresses first means only the current pod IP is dialed.
     """
     ma = Multiaddr(addr)
@@ -149,7 +153,7 @@ async def redial_loop(host, targets, cfg, m):
                 net = host.get_network()
                 if hasattr(net, "unblock_peer"):
                     net.unblock_peer(peer_id)
-                # 15 s: a restarted peer can take longer than 4 s to dial. See tradeoffs.md D12.
+                # 15 s: a restarted peer can take longer than 4 s to dial.
                 with trio.fail_after(15):
                     await host.connect(info_from_p2p_addr(Multiaddr(f"{ip_addr}/p2p/{pid_str}")))
             except Exception as err:  # noqa: BLE001
@@ -178,6 +182,16 @@ async def sample_loop(host, router, cfg, m, names):
         await trio.sleep(1)
 
 
+async def stop_on_sigterm(cancel_scope):
+    """Exit promptly on SIGTERM. As PID 1 the process gets no default SIGTERM action, so without a
+    handler every pod deletion waits out terminationGracePeriodSeconds and ends in SIGKILL."""
+    with trio.open_signal_receiver(signal.SIGTERM, signal.SIGINT) as signals:
+        async for _ in signals:
+            log("stopping")
+            cancel_scope.cancel()
+            return
+
+
 async def main():
     self_key, self_id_obj = identity_for(CFG.name)
     self_id = str(self_id_obj)
@@ -198,6 +212,13 @@ async def main():
     router = GossipSub(protocols=[PROTOCOL_ID_V11], degree=6, degree_low=4, degree_high=12,
                        heartbeat_interval=1, max_messages_per_topic_per_second=500.0)
     pubsub = Pubsub(host, router)
+    forwarders = ForwarderLog()
+
+    def record_forwarder(forwarder, msg):
+        forwarders.record(str(forwarder), msg.from_id, msg.seqno)
+        return True
+
+    pubsub.set_topic_validator(CFG.topic, record_forwarder, False)
     m = Metrics("py", CFG.name)
     threading.Thread(target=serve_http, args=(CFG.metrics_port, m.registry), daemon=True).start()
 
@@ -208,7 +229,8 @@ async def main():
             listenPort=CFG.listen_port, targets=len(targets))
         dedupe = Deduper()
         async with trio.open_nursery() as nursery:
-            nursery.start_soon(receive_loop, sub, self_id, dedupe, m, names)
+            nursery.start_soon(stop_on_sigterm, nursery.cancel_scope)
+            nursery.start_soon(receive_loop, sub, self_id, dedupe, m, names, forwarders)
             nursery.start_soon(redial_loop, host, targets, CFG, m)
             nursery.start_soon(sample_loop, host, router, CFG, m, names)
             if CFG.publisher:

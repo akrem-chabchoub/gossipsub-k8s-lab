@@ -39,10 +39,35 @@ class Deduper:
     def __init__(self):
         self._seen = set()
 
-    def seen(self, publisher_id: str, seq: int) -> bool:
-        """True if (publisher, seq) was already recorded; records it otherwise."""
-        key = (publisher_id, seq)
+    def seen(self, run_id: str, publisher_id: str, seq: int) -> bool:
+        """True if (run, publisher, seq) was already recorded; records it otherwise.
+
+        The run ID is part of the key because seq restarts at 1 when a publisher restarts with a new run.
+        """
+        key = (run_id, publisher_id, seq)
         if key in self._seen:
             return True
         self._seen.add(key)
         return False
+
+
+class ForwarderLog:
+    """Remembers which peer forwarded each message, keyed by (author, seqno).
+
+    py-libp2p's subscription queue yields only the message, whose from_id is the original author.
+    Topic validators are the one place the library passes the forwarding peer, and they run once
+    per new message before it is queued for subscribers. Go reports the same peer as ReceivedFrom.
+    """
+
+    MAX_ENTRIES = 10_000  # bound memory if the queue ever drops a validated message
+
+    def __init__(self):
+        self._by_mid = {}
+
+    def record(self, forwarder: str, from_id: bytes, seqno: bytes) -> None:
+        if len(self._by_mid) >= self.MAX_ENTRIES:
+            self._by_mid.clear()
+        self._by_mid[(from_id, seqno)] = forwarder
+
+    def pop(self, from_id: bytes, seqno: bytes) -> str:
+        return self._by_mid.pop((from_id, seqno), "")

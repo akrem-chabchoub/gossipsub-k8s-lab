@@ -2,7 +2,7 @@ import unittest
 
 from peer.config import load_config
 from peer.identity import identity_for
-from peer.message import Deduper, Message, decode_message, latency_seconds, make_payload
+from peer.message import Deduper, ForwarderLog, Message, decode_message, latency_seconds, make_payload
 
 
 class IdentityTests(unittest.TestCase):
@@ -42,9 +42,16 @@ class MessageTests(unittest.TestCase):
 
     def test_deduper(self):
         d = Deduper()
-        self.assertFalse(d.seen("p", 1))
-        self.assertTrue(d.seen("p", 1))
-        self.assertFalse(d.seen("q", 1))
+        self.assertFalse(d.seen("r1", "p", 1))
+        self.assertTrue(d.seen("r1", "p", 1))
+        self.assertFalse(d.seen("r1", "q", 1))
+        self.assertFalse(d.seen("r2", "p", 1))  # publisher restarted with a new run
+
+    def test_forwarder_log(self):
+        f = ForwarderLog()
+        f.record("fwd", b"author", b"\x01")
+        self.assertEqual(f.pop(b"author", b"\x01"), "fwd")
+        self.assertEqual(f.pop(b"author", b"\x01"), "")  # popped once
 
 
 class ConfigTests(unittest.TestCase):

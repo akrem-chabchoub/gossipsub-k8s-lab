@@ -43,7 +43,8 @@ func MakePayload(n int) string {
 	return strings.Repeat("x", n)
 }
 
-// Deduper tracks (publisher, seq) pairs already seen. Safe for concurrent use.
+// Deduper tracks (run, publisher, seq) triples already seen. Safe for concurrent use.
+// The run ID is part of the key because seq restarts at 1 when a publisher restarts with a new run.
 type Deduper struct {
 	mu   sync.Mutex
 	seen map[string]struct{}
@@ -55,8 +56,8 @@ func NewDeduper() *Deduper {
 
 // Seen reports whether the message was already recorded, and records it if not.
 // It returns true for duplicates.
-func (d *Deduper) Seen(publisherID string, seq int) bool {
-	key := fmt.Sprintf("%s/%d", publisherID, seq)
+func (d *Deduper) Seen(runID, publisherID string, seq int) bool {
+	key := fmt.Sprintf("%s/%s/%d", runID, publisherID, seq)
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if _, ok := d.seen[key]; ok {
@@ -67,8 +68,8 @@ func (d *Deduper) Seen(publisherID string, seq int) bool {
 }
 
 // LatencySeconds converts publish and receive timestamps (ns) to seconds.
-// Negative values mean the clocks disagree; they are clamped to zero and
-// the caller should count them as skew events.
+// Negative values mean the clocks disagree; ok is false and the caller should
+// count a skew event instead of observing a latency.
 func LatencySeconds(publishedNs, receivedNs int64) (float64, bool) {
 	d := receivedNs - publishedNs
 	if d < 0 {

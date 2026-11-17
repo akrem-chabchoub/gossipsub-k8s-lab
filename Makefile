@@ -1,7 +1,7 @@
 CLUSTER  ?= gossip-lab
 CTX      := kind-$(CLUSTER)
-GO_IMG   := gossip/go-peer:0.1.1
-PY_IMG   := gossip/py-peer:0.1.5
+GO_IMG   := gossip/go-peer:0.1.2
+PY_IMG   := gossip/py-peer:0.1.6
 CALICO   := https://raw.githubusercontent.com/projectcalico/calico/v3.30.3/manifests/calico.yaml
 
 .PHONY: up cluster-up build deploy-go-only py-check deploy-mixed status down observability
